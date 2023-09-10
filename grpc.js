@@ -10,6 +10,7 @@ const nodeUtil = require('util');
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 const cache = require('./cache');
+const { meta } = require('consul');
 const cacheLifeTime = 15 * 1000;    // 元数据缓存只存放15秒，降低刷新时注册中心的压力，也保证下次刷新时尽可能总是获取到注册中心最新的数据
 let protoDir = path.join(process.cwd(), 'proto');
 
@@ -48,6 +49,7 @@ class NodeGrpc {
         this.serviceName = grpcConfig.serviceName;  // proto定义的service名称，必填项
 
         this.metaMap = {};    // meta认证参数，key-value的结构，key统一转为小写，选填项，依赖tls配置
+        this.authorization= grpcConfig.authorization;//自定义token认证
         if (grpcConfig['grpcMetaMap']) {
             try {
                 this.metaMap = JSON.parse(grpcConfig['grpcMetaMap']);
@@ -128,7 +130,7 @@ class NodeGrpc {
      */
     createClient() {
         this.metas.forEach(item => {
-            let client = new GRPCClient(item.host, item.tlsMap, item.metaMap, grpc => {
+            let client = new GRPCClient(item.host, item.tlsMap, item.metaMap, this.authorization,grpc => {
                 let packageDefinition = protoLoader.loadSync(item.protoFileList, {
                     keepCase: true,
                     longs: String,
@@ -176,9 +178,13 @@ class NodeGrpc {
      * 请求。不同于dubbo插件原生的socket机制，grpc插件是针对grpc-js的二次封装，所以无需探活处理。
      * @param requestBody
      */
-    request(requestBody, methodName) {
+    request(requestHeaders,requestBody, methodName) {
         if (!this.exact) {
             throw this.error;
+        }
+        let headers = requestHeaders || '';
+        if (typeof headers === 'string') {
+            headers = JSON.parse(headers)
         }
         let body = requestBody || '';
         if (typeof body === 'string') {
@@ -195,7 +201,7 @@ class NodeGrpc {
                 throw new Error('no client available by process pool')
             }
             return new Promise((resolve, reject) => {
-                client.request(methodName, body, resolve, reject);
+                client.request(methodName, body,headers, resolve, reject);
             });
         }
         return new Promise((resolve, reject) => {
@@ -221,11 +227,12 @@ class GRPCClient {
      * @param metaMap：认证元数据的map，只有配了tls才能启用
      * @param callback
      */
-    constructor(host, tlsMap, metaMap, callback) {
+    constructor(host, tlsMap, metaMap,authorization, callback) {
         this.host = host;
         this.callback = callback;
         this.tlsMap = tlsMap;
         this.metaMap = metaMap;
+        this.authorization = authorization;
         this.createTime = new Date().getTime()  // 判断是否过期
         this.init();
     }
@@ -285,7 +292,8 @@ class GRPCClient {
      * @param resolve
      * @param reject
      */
-    request(methodName, body, resolve, reject) {
+    request(methodName, body,headers, resolve, reject) {
+        
         if (this.error) {
             reject && reject(this.error);
             return;
@@ -294,7 +302,17 @@ class GRPCClient {
             reject && reject(new Error('target methodName is not existed'));
             return;
         }
-        this.client[methodName](body, (error, response) => {
+        let metas = new grpc.Metadata();
+        metas.add("authorization",this.authorization);
+        if (headers && JSON.stringify(headers) !== '{}') {
+            for (let key in headers) {
+                if(key==="authorization") {
+                    metas.remove(key);
+                    metas.add(key, headers[key]);
+                }
+            }
+        }
+        this.client[methodName](body, metas,(error, response) => {
             if (error) {
                 reject && reject(error);
             } else {

@@ -9,7 +9,7 @@ let default_settings = {
     appName: 'ike_httpToGrpc',
     bindIP: '0.0.0.0',
     bindPort: 8080,
-    config: './config.json',
+    config: './config/config.json',
 }
 let settings = Object.assign({}, default_settings, JSON.parse(process.env.settings));
 

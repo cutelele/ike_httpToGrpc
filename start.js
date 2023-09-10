@@ -58,6 +58,7 @@ function startHttpServer() {
  * @param response
  */
 async function listenRequestEvent(request, response) {
+    let headers = request.headers;
     request.on('aborted', () => {
         console.error('aborted: client request aborted')
     });
@@ -102,7 +103,7 @@ async function listenRequestEvent(request, response) {
                 body = Object.assign(body, JSON.parse(bodyChunk.toString()));
             }
             try {
-                grpcObj.request(body, grpcMethod).then(resBody => {
+                grpcObj.request(headers,body, grpcMethod).then(resBody => {
                     request.resBody_len = JSON.stringify(resBody).length;
                     request.duration = Date.now() - request.startTime;
                     response.statusCode = 200;

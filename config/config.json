@@ -1,0 +1,9 @@
+{
+  "userManager": {
+    "grpcProtoGroup": "cd2",
+    "grpcServerHosts": "192.168.3.11:19798",
+    "packageName": "clouddrive",
+    "serviceName": "CloudDriveFileSrv",
+    "authorization":"Bearer 29089e59-8edb-4c99-8bb2-f72161a8b595"
+  }
+}
