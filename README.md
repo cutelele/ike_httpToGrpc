@@ -1117,3 +1117,7 @@ git地址：https://github.com/994625905/ike_httpToGrpc
 [httpServer来代理WebSocket通信](https://juejin.cn/post/7124919075402154014)
 
 [JS高效开发技巧指南（持续更新](https://juejin.cn/post/7126735394950873095)
+
+docker build -t crosstree/cd2apihelper:1.0 .
+docker push crosstree/cd2apihelper:1.0
+docker run -d --name cd2apihelper --restart unless-stopped -v cd2apihelperConfig:/app/config -p 19987:8080 crosstree/cd2apihelper:1.0
